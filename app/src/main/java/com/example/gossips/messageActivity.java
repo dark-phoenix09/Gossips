@@ -14,13 +14,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -95,7 +97,6 @@ public class messageActivity extends AppCompatActivity {
         });
 
         //displaying messages
-
         //query
         Query query=db.collection("users").document(uid).collection("chats").document(fid).collection("chat")
                 .orderBy("time", Query.Direction.ASCENDING);
@@ -128,16 +129,36 @@ public class messageActivity extends AppCompatActivity {
         recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
+        ((LinearLayoutManager) Objects.requireNonNull(recyclerView.getLayoutManager())).setStackFromEnd(true);
 
         //goto down
         floatingActionButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 recyclerView.scrollToPosition(adapter.getItemCount()-1);
+                floatingActionButton.setVisibility(View.INVISIBLE);
+            }
+        });
+        //scroll detection
+        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+            }
+
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                if(dy>0){
+                    floatingActionButton.setVisibility(View.INVISIBLE);
+                }else{
+                    floatingActionButton.setVisibility(View.VISIBLE);
+                }
             }
         });
 
     }
+
 
     @Override
     protected void onStop() {
@@ -161,7 +182,14 @@ public class messageActivity extends AppCompatActivity {
         db.collection("users").document(uid).collection("chats").document(fid).collection("chat")
                 .document().set(mp);
         db.collection("users").document(fid).collection("chats").document(uid).collection("chat")
-                .document().set(mp);
+                .document().set(mp).addOnCompleteListener(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+                recyclerView.scrollToPosition(adapter.getItemCount()-1);
+            }
+        });
+        db.collection("users").document(uid).collection("chats").document(fid).set(mp);
+        db.collection("users").document(uid).collection("chats").document(uid).set(mp);
     }
 
     private class msg_data_holder extends RecyclerView.ViewHolder {
