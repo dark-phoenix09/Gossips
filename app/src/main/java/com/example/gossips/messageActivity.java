@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Intent;
+import android.graphics.Paint;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,6 +30,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.squareup.picasso.Picasso;
 
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Objects;
 
@@ -75,6 +78,7 @@ public class messageActivity extends AppCompatActivity {
                 if(documentSnapshot.exists()){
                     image=documentSnapshot.getString("image");
                     Picasso.get().load(image).into(msg_image);
+                    msg_name.setText(documentSnapshot.getString("name"));
                 }else{
                     startActivity(new Intent(messageActivity.this,ChatActivity.class));
                     finish();
@@ -119,9 +123,15 @@ public class messageActivity extends AppCompatActivity {
                 if(uid.equals(model.getSender())){
                     holder.rec_msg.setText("");
                     holder.send_msg.setText(model.getMsg());
+                    holder.send_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
+                    holder.rec_msg_time.setText("");
+                    //holder.send_msg.setPaintFlags(holder.send_msg.getPaintFlags()| Paint.UNDERLINE_TEXT_FLAG);
                 }else{
                     holder.send_msg.setText("");
                     holder.rec_msg.setText(model.getMsg());
+                    holder.rec_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
+                    holder.send_msg_time.setText("");
+                   // holder.rec_msg.setPaintFlags(holder.rec_msg.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);
                 }
             }
         };
@@ -189,18 +199,20 @@ public class messageActivity extends AppCompatActivity {
             }
         });
         db.collection("users").document(uid).collection("chats").document(fid).set(mp);
-        db.collection("users").document(uid).collection("chats").document(uid).set(mp);
+        db.collection("users").document(fid).collection("chats").document(uid).set(mp);
     }
 
     private class msg_data_holder extends RecyclerView.ViewHolder {
         ConstraintLayout send_msg_layout,rec_msg_layout;
-        TextView send_msg,rec_msg;
+        TextView send_msg,rec_msg,rec_msg_time,send_msg_time;
         public msg_data_holder(@NonNull View itemView) {
             super(itemView);
             send_msg_layout=itemView.findViewById(R.id.send_msg_layout);
             rec_msg_layout=itemView.findViewById(R.id.rec_msg_layout);
             send_msg=itemView.findViewById(R.id.send_msg_text);
             rec_msg=itemView.findViewById(R.id.rec_msg_text);
+            rec_msg_time=itemView.findViewById(R.id.rec_msg_time);
+            send_msg_time=itemView.findViewById(R.id.send_msg_time);
         }
     }
 }
