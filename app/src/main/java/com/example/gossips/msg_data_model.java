@@ -1,7 +1,20 @@
 package com.example.gossips;
 
 public class msg_data_model {
-    private String msg,sender,receiver,time;
+    private String msg;
+    private String sender;
+    private String receiver;
+    private String time;
+
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
+    }
+
+    private String image;
 
     public msg_data_model(){}    //needed
 

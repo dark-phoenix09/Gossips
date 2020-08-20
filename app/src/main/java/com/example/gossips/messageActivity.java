@@ -1,14 +1,22 @@
 package com.example.gossips;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Paint;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -29,8 +37,16 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
+import com.iceteck.silicompressorr.FileUtils;
+import com.iceteck.silicompressorr.SiliCompressor;
 import com.squareup.picasso.Picasso;
+import com.theartofdev.edmodo.cropper.CropImage;
+import com.theartofdev.edmodo.cropper.CropImageView;
 
+import java.io.IOException;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -44,13 +60,16 @@ public class messageActivity extends AppCompatActivity {
     CircleImageView msg_image;
     TextView msg_name;
     EditText msg;
-    ImageView send_btn;
+    ImageView send_btn,img_msg,add_img;
     FirebaseAuth mAuth;
     FirebaseFirestore db;
     String fid,uid,name,image;
     RecyclerView recyclerView;
     FirestoreRecyclerAdapter adapter;
     ImageView floatingActionButton;
+    Uri imageUri=null;
+    FirebaseStorage firebaseStorage;
+    StorageReference reference;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +77,9 @@ public class messageActivity extends AppCompatActivity {
         setContentView(R.layout.activity_message);
 
         //initialization
+        firebaseStorage=FirebaseStorage.getInstance();
+        add_img=findViewById(R.id.select_img);
+        img_msg=findViewById(R.id.image_msg);
         floatingActionButton=findViewById(R.id.floatingActionButton);
         recyclerView=findViewById(R.id.message_recyclerview);
         db=FirebaseFirestore.getInstance();
@@ -86,6 +108,23 @@ public class messageActivity extends AppCompatActivity {
                 }
             }
         });
+        //selecting image
+
+        add_img.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.M){
+                    if(ContextCompat.checkSelfPermission(messageActivity.this, Manifest.permission.READ_EXTERNAL_STORAGE)!= PackageManager.PERMISSION_GRANTED){
+                        ActivityCompat.requestPermissions(messageActivity.this,new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},1);
+                    }else {
+                        CropImage.activity()
+                                .setGuidelines(CropImageView.Guidelines.ON)
+                                .setAspectRatio(1,1)
+                                .start(messageActivity.this);
+                    }
+                }
+            }
+        });
 
         //send msg
         send_btn.setOnClickListener(new View.OnClickListener() {
@@ -97,6 +136,7 @@ public class messageActivity extends AppCompatActivity {
                 }else{
                     sendMsg(m);
                     msg.setText("");
+                    img_msg.setImageURI(null);
                 }
             }
         });
@@ -117,27 +157,28 @@ public class messageActivity extends AppCompatActivity {
             class send_msg extends RecyclerView.ViewHolder{
 
                 TextView msg,time;
+                ImageView img;
 
                 public send_msg(@NonNull View itemView) {
                     super(itemView);
                     msg=itemView.findViewById(R.id.my_msg_txt);
                     time=itemView.findViewById(R.id.msg_time);
+                    img=itemView.findViewById(R.id.send_img);
                 }
             }
 
             class rec_msg extends RecyclerView.ViewHolder{
 
                 TextView msg,time;
+                ImageView img;
 
                 public rec_msg(@NonNull View itemView) {
                     super(itemView);
                     msg=itemView.findViewById(R.id.his_msg_txt);
                     time=itemView.findViewById(R.id.msg_time_rec);
+                    img=itemView.findViewById(R.id.rec_img);
                 }
             }
-
-
-
 
             @Override
             public int getItemViewType(int position) {
@@ -168,39 +209,20 @@ public class messageActivity extends AppCompatActivity {
                 if(holder.getItemViewType()==1){
                     send_msg data=(send_msg)holder;
                     data.msg.setText(model.getMsg());
+                    if(!"def".equals(model.getImage())){
+                        Picasso.get().load(model.getImage()).into(data.img);
+                    }
                     data.time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
                 }else if(holder.getItemViewType()==2){
                     rec_msg data=(rec_msg)holder;
                     data.msg.setText(model.getMsg());
+                    if(!"def".equals(model.getImage())){
+                        Picasso.get().load(model.getImage()).into(data.img);
+                    }
                     data.time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
                 }
             }
 
-
-
-//            @NonNull
-//            @Override
-//            public msg_data_holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-//                View view= LayoutInflater.from(parent.getContext()).inflate(R.layout.single_msg_layout,parent,false);
-//                return new msg_data_holder(view);
-//            }
-
-//            @Override
-//            protected void onBindViewHolder(@NonNull msg_data_holder holder, int position, @NonNull msg_data_model model) {
-//                if(uid.equals(model.getSender())){
-//                    holder.rec_msg.setText("");
-//                    holder.send_msg.setText(model.getMsg());
-//                    holder.send_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
-//                    holder.rec_msg_time.setText("");
-//                    //holder.send_msg.setPaintFlags(holder.send_msg.getPaintFlags()| Paint.UNDERLINE_TEXT_FLAG);
-//                }else{
-//                    holder.send_msg.setText("");
-//                    holder.rec_msg.setText(model.getMsg());
-//                    holder.rec_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
-//                    holder.send_msg_time.setText("");
-//                   // holder.rec_msg.setPaintFlags(holder.rec_msg.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);
-//                }
-//            }
         };
 
         recyclerView.setHasFixedSize(true);
@@ -250,37 +272,76 @@ public class messageActivity extends AppCompatActivity {
     }
 
     //sending message
-    public  void sendMsg(String s){
-        HashMap<String,String>mp=new HashMap<>();
-        mp.put("sender",uid);
-        mp.put("receiver",fid);
-        mp.put("msg",s);
-        mp.put("time",String.valueOf(System.currentTimeMillis()));
-        db.collection("users").document(uid).collection("chats").document(fid).collection("chat")
-                .document("M"+String.valueOf(System.currentTimeMillis())).set(mp);
-        db.collection("users").document(fid).collection("chats").document(uid).collection("chat")
-                .document("H"+String.valueOf(System.currentTimeMillis())).set(mp).addOnCompleteListener(new OnCompleteListener<Void>() {
-            @Override
-            public void onComplete(@NonNull Task<Void> task) {
-                recyclerView.scrollToPosition(adapter.getItemCount()-1);
-            }
-        });
-        db.collection("users").document(uid).collection("chats").document(fid).set(mp);
-        db.collection("users").document(fid).collection("chats").document(uid).set(mp);
+    public  void sendMsg(final String s){
+        if(imageUri!=null){
+            reference=firebaseStorage.getReference().child("chats").child(mAuth.getCurrentUser().getUid()+String.valueOf(System.currentTimeMillis())+".jpg");
+            UploadTask uploadTask=reference.putFile(imageUri);
+            uploadTask.addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                    reference.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                        @Override
+                        public void onSuccess(Uri uri) {
+                            String str=String.valueOf(uri);
+                            HashMap<String,String>mp=new HashMap<>();
+                            mp.put("sender",uid);
+                            mp.put("receiver",fid);
+                            mp.put("msg",s);
+                            mp.put("image",str);
+                            mp.put("time",String.valueOf(System.currentTimeMillis()));
+                            db.collection("users").document(uid).collection("chats").document(fid).collection("chat")
+                                    .document("M"+String.valueOf(System.currentTimeMillis())).set(mp);
+                            db.collection("users").document(fid).collection("chats").document(uid).collection("chat")
+                                    .document("H"+String.valueOf(System.currentTimeMillis())).set(mp).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                @Override
+                                public void onComplete(@NonNull Task<Void> task) {
+                                    recyclerView.scrollToPosition(adapter.getItemCount()-1);
+                                }
+                            });
+                            db.collection("users").document(uid).collection("chats").document(fid).set(mp);
+                            db.collection("users").document(fid).collection("chats").document(uid).set(mp);
+                        }
+                    });
+                }
+            });
+        }else{
+            HashMap<String,String>mp=new HashMap<>();
+            mp.put("sender",uid);
+            mp.put("receiver",fid);
+            mp.put("msg",s);
+            mp.put("image","def");
+            mp.put("time",String.valueOf(System.currentTimeMillis()));
+            db.collection("users").document(uid).collection("chats").document(fid).collection("chat")
+                    .document("M"+String.valueOf(System.currentTimeMillis())).set(mp);
+            db.collection("users").document(fid).collection("chats").document(uid).collection("chat")
+                    .document("H"+String.valueOf(System.currentTimeMillis())).set(mp).addOnCompleteListener(new OnCompleteListener<Void>() {
+                @Override
+                public void onComplete(@NonNull Task<Void> task) {
+                    recyclerView.scrollToPosition(adapter.getItemCount()-1);
+                }
+            });
+            db.collection("users").document(uid).collection("chats").document(fid).set(mp);
+            db.collection("users").document(fid).collection("chats").document(uid).set(mp);
+        }
+
     }
 
-//    private class msg_data_holder extends RecyclerView.ViewHolder {
-//        ConstraintLayout send_msg_layout,rec_msg_layout;
-//        TextView send_msg,rec_msg,rec_msg_time,send_msg_time;
-//        public msg_data_holder(@NonNull View itemView) {
-//            super(itemView);
-//            send_msg_layout=itemView.findViewById(R.id.send_msg_layout);
-//            rec_msg_layout=itemView.findViewById(R.id.rec_msg_layout);
-//            send_msg=itemView.findViewById(R.id.send_msg_text);
-//            rec_msg=itemView.findViewById(R.id.rec_msg_text);
-//            rec_msg_time=itemView.findViewById(R.id.rec_msg_time);
-//            send_msg_time=itemView.findViewById(R.id.send_msg_time);
-//        }
-//    }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE) {
+            CropImage.ActivityResult result = CropImage.getActivityResult(data);
+            if (resultCode == RESULT_OK) {
+                assert result != null;
+                Uri resultUri = result.getUri();
+                imageUri=resultUri;
+                img_msg.setImageURI(imageUri);
 
+
+            } else if (resultCode == CropImage.CROP_IMAGE_ACTIVITY_RESULT_ERROR_CODE) {
+                assert result != null;
+                Exception error = result.getError();
+            }
+        }
+    }
 }
