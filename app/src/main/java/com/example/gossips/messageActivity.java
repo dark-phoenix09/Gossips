@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.content.Intent;
 import android.graphics.Paint;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -110,30 +111,96 @@ public class messageActivity extends AppCompatActivity {
                 .setQuery(query,msg_data_model.class).build();
 
         //adapter
-        adapter= new FirestoreRecyclerAdapter<msg_data_model, msg_data_holder>(options) {
+        adapter= new FirestoreRecyclerAdapter<msg_data_model, RecyclerView.ViewHolder>(options) {
+
+
+            class send_msg extends RecyclerView.ViewHolder{
+
+                TextView msg,time;
+
+                public send_msg(@NonNull View itemView) {
+                    super(itemView);
+                    msg=itemView.findViewById(R.id.my_msg_txt);
+                    time=itemView.findViewById(R.id.msg_time);
+                }
+            }
+
+            class rec_msg extends RecyclerView.ViewHolder{
+
+                TextView msg,time;
+
+                public rec_msg(@NonNull View itemView) {
+                    super(itemView);
+                    msg=itemView.findViewById(R.id.his_msg_txt);
+                    time=itemView.findViewById(R.id.msg_time_rec);
+                }
+            }
+
+
+
+
+            @Override
+            public int getItemViewType(int position) {
+                String id=getSnapshots().getSnapshot(position).getReference().getId();
+                if(id.charAt(0)=='M'){
+                    return 1;
+                }else{
+                    return 2;
+                }
+            }
+
+
             @NonNull
             @Override
-            public msg_data_holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-                View view= LayoutInflater.from(parent.getContext()).inflate(R.layout.single_msg_layout,parent,false);
-                return new msg_data_holder(view);
+            public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+                View view;
+                if(viewType==1){
+                    view=LayoutInflater.from(parent.getContext()).inflate(R.layout.send_msg_layout,parent,false);
+                    return new send_msg(view);
+                }else{
+                    view=LayoutInflater.from(parent.getContext()).inflate(R.layout.rec_msg_layout,parent,false);
+                    return  new rec_msg(view);
+                }
             }
 
             @Override
-            protected void onBindViewHolder(@NonNull msg_data_holder holder, int position, @NonNull msg_data_model model) {
-                if(uid.equals(model.getSender())){
-                    holder.rec_msg.setText("");
-                    holder.send_msg.setText(model.getMsg());
-                    holder.send_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
-                    holder.rec_msg_time.setText("");
-                    //holder.send_msg.setPaintFlags(holder.send_msg.getPaintFlags()| Paint.UNDERLINE_TEXT_FLAG);
-                }else{
-                    holder.send_msg.setText("");
-                    holder.rec_msg.setText(model.getMsg());
-                    holder.rec_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
-                    holder.send_msg_time.setText("");
-                   // holder.rec_msg.setPaintFlags(holder.rec_msg.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);
+            protected void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position, @NonNull msg_data_model model) {
+                if(holder.getItemViewType()==1){
+                    send_msg data=(send_msg)holder;
+                    data.msg.setText(model.getMsg());
+                    data.time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
+                }else if(holder.getItemViewType()==2){
+                    rec_msg data=(rec_msg)holder;
+                    data.msg.setText(model.getMsg());
+                    data.time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
                 }
             }
+
+
+
+//            @NonNull
+//            @Override
+//            public msg_data_holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+//                View view= LayoutInflater.from(parent.getContext()).inflate(R.layout.single_msg_layout,parent,false);
+//                return new msg_data_holder(view);
+//            }
+
+//            @Override
+//            protected void onBindViewHolder(@NonNull msg_data_holder holder, int position, @NonNull msg_data_model model) {
+//                if(uid.equals(model.getSender())){
+//                    holder.rec_msg.setText("");
+//                    holder.send_msg.setText(model.getMsg());
+//                    holder.send_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
+//                    holder.rec_msg_time.setText("");
+//                    //holder.send_msg.setPaintFlags(holder.send_msg.getPaintFlags()| Paint.UNDERLINE_TEXT_FLAG);
+//                }else{
+//                    holder.send_msg.setText("");
+//                    holder.rec_msg.setText(model.getMsg());
+//                    holder.rec_msg_time.setText(DateFormat.getDateTimeInstance().format(new Date(Long.parseLong(model.getTime()))));
+//                    holder.send_msg_time.setText("");
+//                   // holder.rec_msg.setPaintFlags(holder.rec_msg.getPaintFlags()|Paint.UNDERLINE_TEXT_FLAG);
+//                }
+//            }
         };
 
         recyclerView.setHasFixedSize(true);
@@ -190,9 +257,9 @@ public class messageActivity extends AppCompatActivity {
         mp.put("msg",s);
         mp.put("time",String.valueOf(System.currentTimeMillis()));
         db.collection("users").document(uid).collection("chats").document(fid).collection("chat")
-                .document().set(mp);
+                .document("M"+String.valueOf(System.currentTimeMillis())).set(mp);
         db.collection("users").document(fid).collection("chats").document(uid).collection("chat")
-                .document().set(mp).addOnCompleteListener(new OnCompleteListener<Void>() {
+                .document("H"+String.valueOf(System.currentTimeMillis())).set(mp).addOnCompleteListener(new OnCompleteListener<Void>() {
             @Override
             public void onComplete(@NonNull Task<Void> task) {
                 recyclerView.scrollToPosition(adapter.getItemCount()-1);
@@ -202,17 +269,18 @@ public class messageActivity extends AppCompatActivity {
         db.collection("users").document(fid).collection("chats").document(uid).set(mp);
     }
 
-    private class msg_data_holder extends RecyclerView.ViewHolder {
-        ConstraintLayout send_msg_layout,rec_msg_layout;
-        TextView send_msg,rec_msg,rec_msg_time,send_msg_time;
-        public msg_data_holder(@NonNull View itemView) {
-            super(itemView);
-            send_msg_layout=itemView.findViewById(R.id.send_msg_layout);
-            rec_msg_layout=itemView.findViewById(R.id.rec_msg_layout);
-            send_msg=itemView.findViewById(R.id.send_msg_text);
-            rec_msg=itemView.findViewById(R.id.rec_msg_text);
-            rec_msg_time=itemView.findViewById(R.id.rec_msg_time);
-            send_msg_time=itemView.findViewById(R.id.send_msg_time);
-        }
-    }
+//    private class msg_data_holder extends RecyclerView.ViewHolder {
+//        ConstraintLayout send_msg_layout,rec_msg_layout;
+//        TextView send_msg,rec_msg,rec_msg_time,send_msg_time;
+//        public msg_data_holder(@NonNull View itemView) {
+//            super(itemView);
+//            send_msg_layout=itemView.findViewById(R.id.send_msg_layout);
+//            rec_msg_layout=itemView.findViewById(R.id.rec_msg_layout);
+//            send_msg=itemView.findViewById(R.id.send_msg_text);
+//            rec_msg=itemView.findViewById(R.id.rec_msg_text);
+//            rec_msg_time=itemView.findViewById(R.id.rec_msg_time);
+//            send_msg_time=itemView.findViewById(R.id.send_msg_time);
+//        }
+//    }
+
 }
